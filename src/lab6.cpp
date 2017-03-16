@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 
 using namespace std;
 
@@ -22,38 +23,173 @@ public:
 	void Sig_info(void);
 	void Save_file(char* filename);
 private:
-	void updateMaxValue(void);
 	void updateMeanValue(void);
 	void fileToArray(char* filename);
 	char* buildFilename(int fileNumber);
 	double* dataArray;
 	int length;
-	int maxNum;
-	int currentMaxNum;
+	double maxNum;
 	double average;
 };
 
-int main() {
-	Signal signal(3);
-	signal.Sig_info();
-	return 0;
+void printUsage(void);
+
+int main(int argc, char* argv[]) {
+	int i, fileNumber;
+	int gotFile = 0;
+	double offsetValue, scaleValue;
+	char arg;
+	for(i=0; i<argc; i++){
+		if((argv[i][0] == '-')&&(argv[i][1] == 'n')){
+			gotFile = 1;
+			if(i+1 == argc){ //if no file number was provided after n, terminate the program
+				printUsage();
+				exit(0);
+			}
+			if(atoi(argv[i+1]) <= 11 && atoi(argv[i+1]) >= 1){ //if file number is between 1 and 11
+				fileNumber = atoi(argv[i+1]);
+			} else {
+				printUsage();
+				exit(0);
+			}
+			break;
+		}
+		if((argv[i][0] == '-')&&(argv[i][1] == 'f')){
+			gotFile = 1;
+			if(i+1 == argc){ //if no file name was provided after f, terminate the program
+				printUsage();
+				exit(0);
+			}
+			break;
+		}
+	}
+	if(gotFile){
+		Signal signalObject(fileNumber); //scan in data from given file
+		for(i=0; i<argc; i++){
+			if(argv[i][0] == '-'){
+				arg = argv[i][1];
+				switch(arg){
+					case 'n':
+						break;
+					case 'o':{
+						if(i+1 == argc){ //if no additional arguments, terminate the program
+							printUsage();
+							exit(0);
+						}
+						if (sscanf(argv[i+1], "%lf", &offsetValue) == 0){ //check that a valid float value was input
+							printUsage();
+							exit(0);
+						}
+						signalObject.offset(offsetValue);
+						i++;
+						break;
+					}
+					case 's':{
+						if(i+1 == argc){ //if no additional arguments, terminate the program
+							printUsage();
+							exit(0);
+						}
+						if (sscanf(argv[i+1], "%lf", &scaleValue) == 0){ //check that a valid float value was input
+							printUsage();
+							exit(0);
+						}
+						signalObject.scale(scaleValue);
+						i++;
+						break;
+					}
+
+					case 'h':
+						printUsage();
+						exit(0);
+						break;
+					case 'S':{
+						signalObject.statistics();
+						signalObject.Sig_info();
+					}
+						break;
+					case 'C':{
+						signalObject.center();
+					}
+						break;
+					case 'N':{
+						signalObject.normalize();
+					}
+						break;
+					default:
+						printUsage();
+						exit(0);
+						break;
+				}
+			}
+		}
+	} else { //menu mode
+		Signal signalObject; //default constructor
+		char input[100]; //char array for ingesting user input
+		int inputNum;
+		while(inputNum != 6){
+			do {
+				cout << endl;
+				cout << "Choose an option: " << endl;
+				cout << "1: Offset data" << endl;
+				cout << "2: Scale data" << endl;
+				cout << "3: Center data" << endl;
+				cout << "4: Normalize data" << endl;
+				cout << "5: Print statistics" << endl;
+				cout << "6: Exit program" << endl;
+				cin >> input;
+				inputNum = atoi(input);
+			} while (inputNum > 6 || inputNum < 1);
+			switch(inputNum){
+			case 1:{
+				double offsetNum;
+				cout << endl << "Enter offset value: ";
+				cin >> offsetNum;
+				signalObject.offset(offsetNum);
+				break;
+			}
+			case 2:{
+				double scaleNum;
+				cout << endl << "Enter scale value: ";
+				cin >> scaleNum;
+				signalObject.scale(scaleNum);
+				break;
+			}
+			case 3:
+				signalObject.center();
+				break;
+			case 4:
+				signalObject.normalize();
+				break;
+			case 5:
+				signalObject.Sig_info();
+				break;
+			case 6:
+				exit(0);
+			default:
+				cout << endl << "Invalid choice, ending program";
+				exit(0);
+				break;
+			}
+		}
+	}
+	return EXIT_SUCCESS;
 }
 
 
 
 Signal::Signal(){
 	fileToArray(buildFilename(1)); //default to file #1
-	statistics();
+	updateMeanValue();
 }
 
 Signal::Signal(int fileNumber){
 	fileToArray(buildFilename(fileNumber));
-	statistics();
+	updateMeanValue();
 }
 
 Signal::Signal(char* filename){
 	fileToArray(filename);
-	statistics();
+	updateMeanValue();
 }
 
 char* Signal::buildFilename(int fileNumber){
@@ -66,24 +202,12 @@ void Signal::fileToArray(char* filename){
 	FILE *fp;
 	int x=0;
 	fp=fopen(filename, "r");
-	fscanf(fp, "%d %d", &length, &maxNum); //read in number of values and maximum value
+	fscanf(fp, "%d %lf", &length, &maxNum); //read in number of values and maximum value
 	dataArray = (double*)calloc(length, sizeof(double)); //allocate memory for number of integers
 	for(x=0;x<length;x++){
 		fscanf(fp, "%lf", &dataArray[x]); //scan values into integer array
 	}
 	fclose(fp);
-}
-
-void Signal::updateMaxValue(void){
-	int i;
-	double max;
-	max = dataArray[0];
-	for(i=1;i<length;i++){
-		if (dataArray[i] > max){
-			max = dataArray[i];
-		}
-	}
-	currentMaxNum = max;
 }
 
 void Signal::updateMeanValue(){
@@ -102,7 +226,7 @@ void Signal::offset(double offsetValue){
 		dataArray[i] += offsetValue;
 	}
 	maxNum += offsetValue;
-	statistics();
+	average += offsetValue;
 }
 
 void Signal::scale(double scaleValue){
@@ -111,27 +235,46 @@ void Signal::scale(double scaleValue){
 		dataArray[i] = dataArray[i] * scaleValue;
 	}
 	maxNum *= scaleValue;
-	statistics();
+	average *= scaleValue;
 }
 
 void Signal::center(void){
-	offset(-1*average);
-	statistics();
+	offset((-1)*average);
 }
 
 void Signal::normalize(void){
 	scale((double)1/maxNum);
-	statistics();
 }
 
 void Signal::statistics(void){
-	updateMeanValue();
-	updateMaxValue();
 }
 
 void Signal::Sig_info(void){
 	cout << endl << "Length: " << length;
 	cout << endl << "Average: " << average;
 	cout << endl << "Maximum: " << maxNum << endl;
+}
+
+void Signal::Save_file(char* newFilename){
+	FILE* fp;
+	int i;
+	fp = fopen(newFilename, "w+");
+	fprintf(fp, "%d %d\n", length, maxNum);
+	for(i=0;i<length;i++){
+		fprintf(fp, "%.*f\n", (double)dataArray[i]);
+	}
+	fclose(fp);
+}
+
+void printUsage(){
+	printf("\nUsage:\n");
+	printf("-n <file number>\tNumber of file to open, between 1 and 11\n");
+	printf("-o <offset value>\tOffset the data by the given value\n");
+	printf("-s <scale factor>\tScale the data by the given scaling factor\n");
+	printf("-r <new filename>\tCreate a copy of the file with the given filename\n");
+	printf("-h\t\t\tDisplay usage instructions\n");
+	printf("-S\t\t\tDisplay data statistics\n");
+	printf("-C\t\t\tCenter the data\n");
+	printf("-N\t\t\tNormalize the data\n");
 }
 
