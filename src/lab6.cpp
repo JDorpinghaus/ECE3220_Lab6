@@ -19,7 +19,6 @@ public:
 	void scale(double scaleValue);
 	void center(void);
 	void normalize(void);
-	void statistics(void);
 	void Sig_info(void);
 	void Save_file(char* filename);
 private:
@@ -35,7 +34,9 @@ private:
 void printUsage(void);
 
 int main(int argc, char* argv[]) {
-	int i, fileNumber;
+	int i;
+	Signal* signalObject;
+	int fileNumber;
 	int gotFile = 0;
 	double offsetValue, scaleValue;
 	char arg;
@@ -48,28 +49,29 @@ int main(int argc, char* argv[]) {
 			}
 			if(atoi(argv[i+1]) <= 11 && atoi(argv[i+1]) >= 1){ //if file number is between 1 and 11
 				fileNumber = atoi(argv[i+1]);
+				signalObject = new Signal(fileNumber);
 			} else {
 				printUsage();
 				exit(0);
 			}
 			break;
-		}
-		if((argv[i][0] == '-')&&(argv[i][1] == 'f')){
+		} else if((argv[i][0] == '-')&&(argv[i][1] == 'f')){
 			gotFile = 1;
 			if(i+1 == argc){ //if no file name was provided after f, terminate the program
 				printUsage();
 				exit(0);
 			}
+			signalObject = new Signal(argv[i+1]);
 			break;
 		}
 	}
 	if(gotFile){
-		Signal signalObject(fileNumber); //scan in data from given file
 		for(i=0; i<argc; i++){
 			if(argv[i][0] == '-'){
 				arg = argv[i][1];
 				switch(arg){
 					case 'n':
+					case 'f':
 						break;
 					case 'o':{
 						if(i+1 == argc){ //if no additional arguments, terminate the program
@@ -80,7 +82,7 @@ int main(int argc, char* argv[]) {
 							printUsage();
 							exit(0);
 						}
-						signalObject.offset(offsetValue);
+						signalObject->offset(offsetValue);
 						i++;
 						break;
 					}
@@ -93,7 +95,7 @@ int main(int argc, char* argv[]) {
 							printUsage();
 							exit(0);
 						}
-						signalObject.scale(scaleValue);
+						signalObject->scale(scaleValue);
 						i++;
 						break;
 					}
@@ -103,16 +105,15 @@ int main(int argc, char* argv[]) {
 						exit(0);
 						break;
 					case 'S':{
-						signalObject.statistics();
-						signalObject.Sig_info();
+						signalObject->Sig_info();
 					}
 						break;
 					case 'C':{
-						signalObject.center();
+						signalObject->center();
 					}
 						break;
 					case 'N':{
-						signalObject.normalize();
+						signalObject->normalize();
 					}
 						break;
 					default:
@@ -126,7 +127,7 @@ int main(int argc, char* argv[]) {
 		Signal signalObject; //default constructor
 		char input[100]; //char array for ingesting user input
 		int inputNum;
-		while(inputNum != 6){
+		while(inputNum != 7){
 			do {
 				cout << endl;
 				cout << "Choose an option: " << endl;
@@ -135,7 +136,8 @@ int main(int argc, char* argv[]) {
 				cout << "3: Center data" << endl;
 				cout << "4: Normalize data" << endl;
 				cout << "5: Print statistics" << endl;
-				cout << "6: Exit program" << endl;
+				cout << "6: Save file" << endl;
+				cout << "7: Exit program" << endl;
 				cin >> input;
 				inputNum = atoi(input);
 			} while (inputNum > 6 || inputNum < 1);
@@ -164,6 +166,11 @@ int main(int argc, char* argv[]) {
 				signalObject.Sig_info();
 				break;
 			case 6:
+				char newFilename[100];
+				cout << endl << "Enter filename: ";
+				cin >> newFilename;
+				signalObject.Save_file(newFilename);
+			case 7:
 				exit(0);
 			default:
 				cout << endl << "Invalid choice, ending program";
@@ -246,9 +253,6 @@ void Signal::normalize(void){
 	scale((double)1/maxNum);
 }
 
-void Signal::statistics(void){
-}
-
 void Signal::Sig_info(void){
 	cout << endl << "Length: " << length;
 	cout << endl << "Average: " << average;
@@ -259,9 +263,9 @@ void Signal::Save_file(char* newFilename){
 	FILE* fp;
 	int i;
 	fp = fopen(newFilename, "w+");
-	fprintf(fp, "%d %d\n", length, maxNum);
+	fprintf(fp, "%d %lf\n", length, maxNum);
 	for(i=0;i<length;i++){
-		fprintf(fp, "%.*f\n", (double)dataArray[i]);
+		fprintf(fp, "%lf\n", dataArray[i]);
 	}
 	fclose(fp);
 }
